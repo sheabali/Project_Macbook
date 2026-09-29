@@ -1,0 +1,409 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String     @id @default(auto()) @map("_id") @db.ObjectId
+  firstName      String
+  lastName       String
+  userName       String?
+  email          String     @unique
+  password       String
+  area           String?
+  city           String?
+  region         String?
+  profileImage   String?
+  coverImage     String?
+  emailVerified  Boolean    @default(false)
+  role           UserRole   @default(USER)
+  status         UserStatus @default(ACTIVE)
+  suspendedUntil DateTime?
+  lastLoginAt    DateTime?
+  expirationOtp  DateTime?
+  otp            Int?
+  fcmToken       String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  //Relation
+  Buyer             Buyer?
+  Seller            Seller?
+  SubscriptionOffer SubscriptionOffer[] @relation("UserRelation")
+  UserSubscription  UserSubscription[]  @relation("UserRelation")
+  Product           Product[]           @relation("UserRelation")
+  Notification      Notification[]      @relation("UserRelation")
+  roomsAsSender     Room[]              @relation("RoomSender")
+  roomsAsReceiver   Room[]              @relation("RoomReceiver")
+  following         Follow[]            @relation("Following")
+  followers         Follow[]            @relation("Followers")
+  Offer             Offer[]
+  buyerOrder        Order[]             @relation("buyerRelation")
+  sellertOrder      Order[]             @relation("sellerRelation")
+  Review            Review[]
+  Reporter          Report[]            @relation("Reporter")
+  Reported          Report[]            @relation("Reported")
+
+  @@map("users")
+}
+
+model Buyer {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique @db.ObjectId
+  category  String
+  interests String[]
+  brands    String[]
+  shoeSize  String?
+  topSize   String?
+  skirtSize String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  //Relation
+  User User @relation(fields: [userId], references: [id])
+
+  @@map("buyers")
+}
+
+model Seller {
+  id                                String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId                            String       @unique @db.ObjectId
+  shopName                          String
+  bio                               String?
+  phoneNumber                       String?
+  mobileMoneyNumber                 String?
+  serviceProvider                   String?
+  registerdNameFormobileMoneyNumber String?
+  facebook                          String?
+  twitter                           String?
+  instagram                         String?
+  snapchat                          String?
+  tiktok                            String?
+  profileImage                      String?
+  status                            SellerStatus @default(PENDING)
+  approved                          Boolean      @default(false)
+  subscriptionId                    String?      @db.ObjectId
+  createdAt                         DateTime     @default(now())
+  updatedAt                         DateTime     @updatedAt
+
+  // Relations
+  User User @relation(fields: [userId], references: [id])
+
+  @@map("sellers")
+}
+
+model SubscriptionOffer {
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  createdBy  String     @db.ObjectId
+  planName   String
+  planType   String
+  facilities String[]   @default([])
+  price      Float
+  duration   Int
+  status     UserStatus @default(ACTIVE)
+  isDeleted  Boolean    @default(false)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  //relation
+  creator          User               @relation("UserRelation", fields: [createdBy], references: [id])
+  UserSubscription UserSubscription[]
+
+  @@map("subscription_offers")
+}
+
+model UserSubscription {
+  id                  String             @id @default(auto()) @map("_id") @db.ObjectId
+  userId              String             @db.ObjectId
+  subscriptionOfferId String             @db.ObjectId
+  startDate           DateTime           @default(now())
+  endDate             DateTime           @default(now())
+  paymentId           String             @default("")
+  duration            Int?               @default(30)
+  paymentStatus       PaymentStatus      @default(PENDING)
+  status              SubscriptionStatus @default(PENDING)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  //relation
+  subscriptionOffer SubscriptionOffer @relation(fields: [subscriptionOfferId], references: [id])
+  user              User              @relation("UserRelation", fields: [userId], references: [id])
+  Payment           Payment[]         @relation("subscriptionRelation")
+
+  @@map("user_subscriptions")
+}
+
+model Payment {
+  id                         String        @id @default(auto()) @map("_id") @db.ObjectId
+  paymentId                  String?       @default("")
+  paymentAmount              Float
+  subscriptionId             String?       @db.ObjectId
+  paymentDate                DateTime      @default(now())
+  receiverId                 String        @db.ObjectId
+  paystackCustomerIdProvider String?
+  paystackAccountIdReceiver  String?
+  status                     PaymentStatus @default(PENDING)
+  createdAt                  DateTime      @default(now())
+  updatedAt                  DateTime      @updatedAt
+
+  subscription UserSubscription? @relation("subscriptionRelation", fields: [subscriptionId], references: [id])
+
+  @@map("payments")
+}
+
+model Product {
+  id             String      @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String      @db.ObjectId
+  productName    String
+  hashtag        String?
+  productType    String
+  brand          String
+  setPrice       Float
+  offeredPrice   Float?
+  description    String
+  category       String
+  interest       String
+  condition      String
+  availableSize  String[]
+  color          String[]
+  setDiscount    Float?
+  discoutedPrice Float?
+  mainImage      String
+  subImages      String[]    @default([])
+  totalViews     Int         @default(0)
+  salesCount     Int         @default(0)
+  orderStatus    OrderStatus @default(PENDING)
+  isDraft        Boolean?    @default(false)
+  isDeleted      Boolean?    @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  user         User?          @relation("UserRelation", fields: [userId], references: [id])
+  Wishlist     Wishlist[]
+  Offer        Offer[]
+  Order        Order[]
+  Review       Review[]
+  Notification Notification[]
+
+  @@map("products")
+}
+
+model Wishlist {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  buyerId   String   @db.ObjectId
+  productId String   @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  //relation
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("wishlists")
+}
+
+model Offer {
+  id                 String      @id @default(auto()) @map("_id") @db.ObjectId
+  senderId           String      @db.ObjectId
+  receverId          String      @db.ObjectId
+  productId          String      @db.ObjectId
+  offerPrice         Float
+  lastCounterBy      String?
+  sellerCounterCount Int         @default(0)
+  buyerCounterCount  Int         @default(0)
+  buyerAccepted      Boolean     @default(false)
+  sellerAccepted     Boolean     @default(false)
+  status             OfferStatus @default(PENDING)
+  createdAt          DateTime    @default(now())
+
+  buyer   User    @relation(fields: [senderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Notification {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String?  @db.ObjectId
+  productId   String?  @db.ObjectId
+  toMessageId String?  @db.ObjectId
+  title       String
+  body        String
+  data        String?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user    User?    @relation("UserRelation", fields: [userId], references: [id])
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@map("Notifications")
+}
+
+model Room {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  senderId   String   @db.ObjectId
+  receiverId String   @db.ObjectId
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sender   User   @relation("RoomSender", fields: [senderId], references: [id])
+  receiver User   @relation("RoomReceiver", fields: [receiverId], references: [id])
+  chat     Chat[]
+}
+
+model Chat {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  senderId   String   @db.ObjectId
+  receiverId String   @db.ObjectId
+  roomId     String   @db.ObjectId
+  message    String
+  isRead     Boolean  @default(false)
+  fileUrl    String?
+  orderId    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  room Room @relation(fields: [roomId], references: [id])
+}
+
+model Follow {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  followerId  String   @db.ObjectId
+  followingId String   @db.ObjectId
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("Following", fields: [followerId], references: [id])
+  following User @relation("Followers", fields: [followingId], references: [id])
+
+  @@unique([followerId, followingId]) // Prevent duplicate follows
+}
+
+model Order {
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
+  buyerId        String?        @db.ObjectId
+  sellerId       String         @db.ObjectId
+  productId      String         @db.ObjectId
+  progressStatus progressStatus @default(CONFIRMED)
+  estimatedDate  DateTime?
+  estimatedTime  String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  //relation
+  buyer   User?   @relation("buyerRelation", fields: [buyerId], references: [id])
+  seller  User    @relation("sellerRelation", fields: [sellerId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Review {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  buyerId   String   @db.ObjectId
+  productId String   @db.ObjectId
+  sellerId  String   @db.ObjectId
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+  buyer   User    @relation(fields: [buyerId], references: [id])
+}
+
+model Report {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  reporterId     String   @db.ObjectId
+  reportedUserId String   @db.ObjectId
+  reportReason   String
+  description    String
+  createdAt      DateTime @default(now())
+
+  reporter User @relation("Reporter", fields: [reporterId], references: [id])
+  reported User @relation("Reported", fields: [reportedUserId], references: [id])
+}
+
+model Promo {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  name       String?
+  link       String?
+  promoImage String
+  promoType  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("promos")
+}
+
+model Banner {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String?
+  link        String?
+  bannerImage String
+  bannerType  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("banners")
+}
+
+enum UserRole {
+  USER
+  BUYER
+  SELLER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  BLOCKED
+}
+
+enum SellerStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SubscriptionPlan {
+  BASIC
+  STANDARD
+  UNLIMITED
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  COUNTER
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SOLD
+}
+
+enum progressStatus {
+  CONFIRMED
+  IN_PROCESS
+  SHIPPED
+  IN_TRANSIT
+  RECEIVED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  PAID
+  FAILED
+}
